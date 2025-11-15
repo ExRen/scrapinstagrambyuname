@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pengelola URL & Caption Postingan</title>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+
+        const Upload = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+        );
+
+        const Download = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+        );
+
+        const FileText = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+        );
+
+        const Link = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+        );
+
+        const Calendar = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+        );
+
+        const Search = ({ className = "w-6 h-6" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        );
+
+        const ArrowUpDown = ({ className = "w-4 h-4" }) => (
+            <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+        );
+
+        function PostManager() {
+            const [urlFiles, setUrlFiles] = useState([]);
+            const [captionFiles, setCaptionFiles] = useState([]);
+            const [tableData, setTableData] = useState([]);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [sortConfig, setSortConfig] = useState({ key: 'index', direction: 'asc' });
+
+            const readFileContent = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsText(file);
+                });
+            };
+
+            const handleUrlUpload = (e) => {
+                const files = Array.from(e.target.files);
+                setUrlFiles(files);
+            };
+
+            const handleCaptionUpload = (e) => {
+                const files = Array.from(e.target.files);
+                setCaptionFiles(files);
+            };
+
+            const processFiles = async () => {
+                if (urlFiles.length === 0 || captionFiles.length === 0) {
+                    alert('Silakan upload file URL dan Caption terlebih dahulu');
+                    return;
+                }
+
+                setIsProcessing(true);
+
+                try {
+                    const urlData = [];
+                    for (const file of urlFiles) {
+                        const content = await readFileContent(file);
+                        urlData.push({
+                            filename: file.name,
+                            content: content.trim()
+                        });
+                    }
+
+                    const captionData = [];
+                    for (const file of captionFiles) {
+                        const content = await readFileContent(file);
+                        captionData.push({
+                            filename: file.name,
+                            content: content.trim()
+                        });
+                    }
+
+                    // Sort by filename
+                    urlData.sort((a, b) => a.filename.localeCompare(b.filename));
+                    captionData.sort((a, b) => a.filename.localeCompare(b.filename));
+
+                    // Match by index (paired by order)
+                    const maxLength = Math.max(urlData.length, captionData.length);
+                    const mergedData = [];
+                    
+                    for (let i = 0; i < maxLength; i++) {
+                        mergedData.push({
+                            index: i + 1,
+                            urlFilename: urlData[i]?.filename || '-',
+                            captionFilename: captionData[i]?.filename || '-',
+                            url: urlData[i]?.content || '-',
+                            caption: captionData[i]?.content || '-'
+                        });
+                    }
+
+                    setTableData(mergedData);
+                } catch (error) {
+                    console.error('Error processing files:', error);
+                    alert('Terjadi kesalahan saat memproses file');
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            const handleSort = (key) => {
+                let direction = 'asc';
+                if (sortConfig.key === key && sortConfig.direction === 'asc') {
+                    direction = 'desc';
+                }
+                setSortConfig({ key, direction });
+            };
+
+            const filteredAndSortedData = useMemo(() => {
+                let filtered = [...tableData];
+
+                // Filter
+                if (searchQuery) {
+                    filtered = filtered.filter(row => 
+                        row.urlFilename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        row.captionFilename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        row.url.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        row.caption.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                }
+
+                // Sort
+                filtered.sort((a, b) => {
+                    let aVal = a[sortConfig.key];
+                    let bVal = b[sortConfig.key];
+
+                    if (sortConfig.key === 'index') {
+                        aVal = parseInt(aVal);
+                        bVal = parseInt(bVal);
+                    }
+
+                    if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+
+                return filtered;
+            }, [tableData, searchQuery, sortConfig]);
+
+            const exportToExcel = () => {
+                if (tableData.length === 0) {
+                    alert('Tidak ada data untuk di-export');
+                    return;
+                }
+
+                const exportData = filteredAndSortedData.map(row => ({
+                    'No': row.index,
+                    'File URL': row.urlFilename,
+                    'File Caption': row.captionFilename,
+                    'URL': row.url,
+                    'Caption': row.caption
+                }));
+
+                const worksheet = XLSX.utils.json_to_sheet(exportData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Postingan');
+
+                worksheet['!cols'] = [
+                    { wch: 5 },
+                    { wch: 35 },
+                    { wch: 35 },
+                    { wch: 50 },
+                    { wch: 80 }
+                ];
+
+                XLSX.writeFile(workbook, `postingan_${new Date().toISOString().split('T')[0]}.xlsx`);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                                <FileText className="text-indigo-600" />
+                                Pengelola URL & Caption Postingan
+                            </h1>
+                            <p className="text-gray-600 mb-6">Upload file TXT URL dan Caption untuk menampilkan dalam tabel</p>
+
+                            <div className="grid md:grid-cols-2 gap-6 mb-6">
+                                <div className="border-2 border-dashed border-indigo-300 rounded-xl p-6 hover:border-indigo-500 transition-colors">
+                                    <label className="cursor-pointer block">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <Link className="w-12 h-12 text-indigo-600" />
+                                            <span className="font-semibold text-gray-700">Upload File URL</span>
+                                            <span className="text-sm text-gray-500">File berisi link postingan</span>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept=".txt"
+                                                onChange={handleUrlUpload}
+                                                className="hidden"
+                                            />
+                                            {urlFiles.length > 0 && (
+                                                <span className="text-sm text-indigo-600 font-medium">
+                                                    {urlFiles.length} file dipilih
+                                                </span>
+                                            )}
+                                        </div>
+                                    </label>
+                                </div>
+
+                                <div className="border-2 border-dashed border-green-300 rounded-xl p-6 hover:border-green-500 transition-colors">
+                                    <label className="cursor-pointer block">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <FileText className="w-12 h-12 text-green-600" />
+                                            <span className="font-semibold text-gray-700">Upload File Caption</span>
+                                            <span className="text-sm text-gray-500">File berisi caption postingan</span>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept=".txt"
+                                                onChange={handleCaptionUpload}
+                                                className="hidden"
+                                            />
+                                            {captionFiles.length > 0 && (
+                                                <span className="text-sm text-green-600 font-medium">
+                                                    {captionFiles.length} file dipilih
+                                                </span>
+                                            )}
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={processFiles}
+                                    disabled={isProcessing || urlFiles.length === 0 || captionFiles.length === 0}
+                                    className="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Upload className="w-5 h-5" />
+                                    {isProcessing ? 'Memproses...' : 'Proses & Tampilkan Tabel'}
+                                </button>
+
+                                <button
+                                    onClick={exportToExcel}
+                                    disabled={tableData.length === 0}
+                                    className="bg-green-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                >
+                                    <Download className="w-5 h-5" />
+                                    Export Excel
+                                </button>
+                            </div>
+                        </div>
+
+                        {tableData.length > 0 && (
+                            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+                                <div className="p-6 bg-indigo-600 text-white">
+                                    <div className="flex items-center justify-between">
+                                        <h2 className="text-xl font-bold flex items-center gap-2">
+                                            <Calendar className="w-6 h-6" />
+                                            Data Postingan ({filteredAndSortedData.length} dari {tableData.length} item)
+                                        </h2>
+                                    </div>
+                                </div>
+
+                                <div className="p-6 border-b">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                        <input
+                                            type="text"
+                                            placeholder="Cari nama file, URL, atau caption..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th 
+                                                    onClick={() => handleSort('index')}
+                                                    className="px-6 py-4 text-left text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 w-20"
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        No
+                                                        <ArrowUpDown className="w-4 h-4" />
+                                                    </div>
+                                                </th>
+                                                <th 
+                                                    onClick={() => handleSort('urlFilename')}
+                                                    className="px-6 py-4 text-left text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100"
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        File URL
+                                                        <ArrowUpDown className="w-4 h-4" />
+                                                    </div>
+                                                </th>
+                                                <th 
+                                                    onClick={() => handleSort('captionFilename')}
+                                                    className="px-6 py-4 text-left text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100"
+                                                >
+                                                    <div className="flex items-center gap-1">
+                                                        File Caption
+                                                        <ArrowUpDown className="w-4 h-4" />
+                                                    </div>
+                                                </th>
+                                                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                                                    URL Postingan
+                                                </th>
+                                                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700">
+                                                    Caption
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200">
+                                            {filteredAndSortedData.map((row, index) => (
+                                                <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4 text-sm text-gray-700 font-medium">
+                                                        {row.index}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">
+                                                        {row.urlFilename}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">
+                                                        {row.captionFilename}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-blue-600">
+                                                        {row.url !== '-' ? (
+                                                            <a href={row.url} target="_blank" rel="noopener noreferrer" className="hover:underline break-all">
+                                                                {row.url}
+                                                            </a>
+                                                        ) : (
+                                                            <span className="text-gray-400">-</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-sm text-gray-700">
+                                                        <div className="max-h-32 overflow-y-auto whitespace-pre-wrap">
+                                                            {row.caption}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<PostManager />, document.getElementById('root'));
+    </script>
+</body>
+</html>
