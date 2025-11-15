@@ -265,7 +265,7 @@ Label(content_frame, text=info_text, font=("Segoe UI", 9),
       fg="#808080", bg="#1a1a1a", justify=CENTER).pack(pady=(30, 0))
 
 # Footer
-Label(root, text="© 2024 Mainak", font=("Segoe UI", 9), 
+Label(root, text="© 2025 bimsky", font=("Segoe UI", 9), 
       fg="#606060", bg="#1a1a1a").pack(side=BOTTOM, pady=15)
 
 root.mainloop()
